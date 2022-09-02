@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/snakesneaks/discord-channel-management-bot/entity"
 	"github.com/snakesneaks/discord-channel-management-bot/usecase/port"
@@ -33,10 +34,15 @@ func (r discordChannelRepository) Create(channel *entity.DiscordChannel) error {
 }
 
 func (r discordChannelRepository) Update(channel *entity.DiscordChannel) error {
-	if _, err := r.GetChannel(channel.GuildID, channel.ChannelID); err != nil {
+	stored, err := r.GetChannel(channel.GuildID, channel.ChannelID)
+	if err != nil {
 		return err
 	}
 
+	channel.ID = stored.ID
+	channel.CreatedAt = stored.CreatedAt
+	channel.UpdatedAt = time.Now()
+	channel.DeletedAt = stored.DeletedAt
 	tx := r.conn.Save(channel)
 	if tx.Error != nil {
 		return tx.Error
@@ -81,41 +87,4 @@ func (r discordChannelRepository) GetChannels(guildID string) ([]*entity.Discord
 		return nil, tx.Error
 	}
 	return c_stored, nil
-}
-
-// if found, return true with no error
-func (r discordChannelRepository) GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error) {
-	var c_stored *entity.DiscordChannelSetting
-	tx := r.conn.Where("guild_id = ?", guildID).First(&c_stored)
-	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return nil, false, tx.Error
-	}
-	if tx.RowsAffected != 1 || tx.Error == gorm.ErrRecordNotFound {
-		return nil, false, nil
-	}
-	return c_stored, true, nil
-}
-
-func (r discordChannelRepository) CreateOrUpdateSetting(s *entity.DiscordChannelSetting) error {
-	var stored entity.DiscordChannelSetting
-	tx := r.conn.Where("guild_id = ?", s.GuildID).First(&stored)
-	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
-		return tx.Error
-	}
-	if tx.RowsAffected == 1 || tx.Error == gorm.ErrRecordNotFound {
-		tx := r.conn.Save(s)
-		if tx.Error != nil {
-			return tx.Error
-		}
-	} else {
-		tx := r.conn.Create(s)
-		if tx.Error != nil {
-			return tx.Error
-		}
-		if tx.RowsAffected != 1 {
-			return fmt.Errorf("failed to create %+#v", s)
-		}
-	}
-
-	return nil
 }

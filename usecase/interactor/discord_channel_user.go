@@ -38,6 +38,10 @@ func (i discordChannelUserInteractor) GetChannelUsersOfGuild(guildID string) ([]
 func (i discordChannelUserInteractor) GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error) {
 	return i.repository.GetChannelUsersOfUser(guildID, userID)
 }
+
+func (i discordChannelUserInteractor) GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error) {
+	return i.repository.GetChannelUserInChannel(guildID, channelID, userID)
+}
 func (i discordChannelUserInteractor) GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error) {
 	return i.repository.GetChannelUsersInChannel(guildID, channelID)
 }

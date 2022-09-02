@@ -13,10 +13,6 @@ type DiscordChannelInputPort interface {
 
 	GetChannel(guildID, channelID string) (*entity.DiscordChannel, error)
 	GetChannels(guildID string) ([]*entity.DiscordChannel, error)
-
-	//GetSetting get setting. if not exist, create and get setting.
-	GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error)
-	CreateOrUpdateSetting(*entity.DiscordChannelSetting) error
 }
 
 type DiscordChannelOutputPort interface {
@@ -31,8 +27,4 @@ type DiscordChannelRepository interface {
 
 	GetChannel(guildID, channelID string) (*entity.DiscordChannel, error)
 	GetChannels(guildID string) ([]*entity.DiscordChannel, error)
-
-	//GetSetting get setting of each guild.
-	GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error)
-	CreateOrUpdateSetting(*entity.DiscordChannelSetting) error
 }

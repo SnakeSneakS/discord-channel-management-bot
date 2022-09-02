@@ -3,25 +3,35 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/snakesneaks/discord-channel-management-bot/driver"
 	"github.com/snakesneaks/discord-channel-management-bot/driver/discord"
+	"github.com/snakesneaks/discord-channel-management-bot/driver/discord_channel"
+	"github.com/snakesneaks/discord-channel-management-bot/driver/discord_channel_user"
+	"github.com/snakesneaks/discord-channel-management-bot/driver/discord_setting"
 )
 
-const (
-	commandHelp          = "help"
-	commandCreateChannel = "create-channel"
-	commandJoinChannel   = "join-channel"
-	commandLeaveChannel  = "leave-channel"
-	commandDeleteChannel = "delete-channel"
-	commandShowChannels  = "show-channels"
-	commandTest          = "test"
+const instantMessageDuration = time.Second * 20
 
-	optionChannelID        = "channel-id"
+const (
+	commandHelp              = "help"
+	commandCreateChannel     = "create"
+	commandJoinChannel       = "join"
+	commandInviteChannelUser = "invite"
+	commandLeaveChannel      = "leave"
+	commandDeleteChannel     = "delete"
+	commandUpdateInfo        = "update-info"
+	commandTest              = "test"
+
 	optionChannelName      = "channel-name"
 	optionChannelTopic     = "channel-topic"
 	optionChannelIsPrivate = "channel-is-private"
+
+	optionChannelID = "channel-id"
+	optionUser      = "user"
+	optionChannel   = "channel"
 )
 
 func newDiscordCommands() []*discordgo.ApplicationCommand {
@@ -71,13 +81,31 @@ func newDiscordCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
+			Name:        commandInviteChannelUser,
+			Description: "invite user to channel",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        optionChannel,
+					Description: "channel",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionUser,
+					Name:        optionUser,
+					Description: "user",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        commandLeaveChannel,
 			Description: "leave channel",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        optionChannelID,
-					Description: "channel id",
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        optionChannel,
+					Description: "channel",
 					Required:    true,
 				},
 			},
@@ -88,16 +116,16 @@ func newDiscordCommands() []*discordgo.ApplicationCommand {
 			DefaultMemberPermissions: &permissionManageServer,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        optionChannelID,
-					Description: "channel id",
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        optionChannel,
+					Description: "channel",
 					Required:    true,
 				},
 			},
 		},
 		{
-			Name:        commandShowChannels,
-			Description: "show channels",
+			Name:        commandUpdateInfo,
+			Description: "update info",
 		},
 		/*
 			{
@@ -119,175 +147,178 @@ func getOptionMap(i *discordgo.Interaction) map[string]*discordgo.ApplicationCom
 }
 
 func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	discordChannelDriver := driver.NewDiscordChannelDriver()
-	discordChannelUserDriver := driver.NewDiscordChannelUserDriver()
+	discordDriver := driver.NewDiscordDriver(
+		discord_channel.NewDiscordChannelDriver(),
+		discord_channel_user.NewDiscordChannelUserDriver(),
+		discord_setting.NewDiscordSettingDriver(),
+	)
 
 	commandHandlers := map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		//Command Help
 		commandHelp: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			commands := "[command]: [description]\n"
 			for _, v := range newDiscordCommands() {
 				commands += fmt.Sprintf("`/%s`: %s\n", v.Name, v.Description)
 			}
-			discord.CreateMessage(s, i.Interaction, commands)
+			discord.CreateMessageInstant(s, i.Interaction, commands, instantMessageDuration)
 		},
+
+		//Command Create Channel
 		commandCreateChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			//get input
+			discord.CreateMessageInstant(s, i.Interaction, "trying to create channel", instantMessageDuration)
+
+			//get option
 			optMap := getOptionMap(i.Interaction)
 			channelName, ok := optMap[optionChannelName]
 			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelName))
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannelName), instantMessageDuration)
 				return
 			}
 			channelTopic, ok := optMap[optionChannelTopic]
 			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelTopic))
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannelTopic), instantMessageDuration)
 				return
 			}
 			isPrivate, ok := optMap[optionChannelIsPrivate]
 			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelIsPrivate))
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannelIsPrivate), instantMessageDuration)
 				return
-			}
-
-			//get or create setting
-			setting, found, err := discordChannelDriver.GetSetting(i.GuildID)
-			if err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to get setting. %v", err))
-			}
-			if !found {
-				category, err := discord.CreateCategory(s, i.Interaction, "discord-channel-management-bot-category", "this is the category discord-channel-management-bot handle.", 99999)
-				if err != nil {
-					discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to create category. %v", err))
-					return
-				}
-
-				setting, err = discordChannelDriver.CreateSetting(category.GuildID, category.ID)
-				if err != nil {
-					discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to create setting in database. %v", err))
-				}
 			}
 
 			//create channel
-			c, err := discord.CreateChannel(s, i.Interaction, channelName.StringValue(), channelTopic.StringValue(), setting.ParentCategoryID, isPrivate.BoolValue())
+			c, err := discordDriver.CreateChannel(s, i.Interaction, i.GuildID, channelName.StringValue(), channelTopic.StringValue(), isPrivate.BoolValue())
 			if err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to create channel. %v", err))
-				return
-			}
-			if err := discordChannelDriver.CreateChannel(i.GuildID, c.ID, c.Name, c.Topic, i.Member.User.ID, isPrivate.BoolValue()); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to create channel in database. %v", err))
-				return
-			}
-
-			//join user
-			if err := discord.SetMemberPermissionToChannel(s, c.ID, i.Member.User.ID, true); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to join channel. %v", err))
-				return
-			}
-			if err := discordChannelUserDriver.JoinOrLeaveChannel(i.GuildID, c.ID, i.Member.User.ID, true); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to join channel in database. %v", err))
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
 				return
 			}
 
 			//success
-			discord.CreateMessage(s, i.Interaction, fmt.Sprintf("channel created!\n`id`: %s\n`name`: %s\n`topic`: %s", c.ID, c.Name, c.Topic))
+			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("channel created!\n`id`: %s\n`name`: %s\n`topic`: %s", c.ID, c.Name, c.Topic), instantMessageDuration)
+
+			//show info
+			if err := discordDriver.ShowInfo(s, i.GuildID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
 		},
+
+		//Command Join Channel
 		commandJoinChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to join channel", instantMessageDuration)
+
+			//get option
 			optMap := getOptionMap(i.Interaction)
 			channelID, ok := optMap[optionChannelID]
 			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelID))
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannelID), instantMessageDuration)
 				return
 			}
 
-			channel, err := discordChannelDriver.GetChannel(i.GuildID, channelID.StringValue())
-			if err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: %v", err))
-				return
-			}
-
-			if channel.IsPrivate {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: channel {%s} is a private channel. you must be invited by user in that channel.", channelID.StringValue()))
-				return
-			}
-
-			if err := discord.SetMemberPermissionToChannel(s, channelID.StringValue(), i.Member.User.ID, true); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to join channel. %v", err))
-				return
-			}
-
-			if err := discordChannelUserDriver.JoinOrLeaveChannel(i.GuildID, channelID.StringValue(), i.Member.User.ID, true); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to join channel in database. %v", err))
-				return
-			}
-
-			discord.CreateMessage(s, i.Interaction, fmt.Sprintf("user %s joined into %s.", i.Member.User.Mention(), channel.ChannelID))
-		},
-		commandLeaveChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			optMap := getOptionMap(i.Interaction)
-			channelID, ok := optMap[optionChannelID]
-			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelID))
-				return
-			}
-
-			if err := discord.SetMemberPermissionToChannel(s, channelID.StringValue(), i.Member.User.ID, false); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to leave channel. %v", err))
-				return
-			}
-
-			if err := discordChannelUserDriver.JoinOrLeaveChannel(i.GuildID, channelID.StringValue(), i.Member.User.ID, false); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to leave channel in database. %v", err))
+			//join
+			if err := discordDriver.JoinChannel(s, i.GuildID, channelID.StringValue(), i.Member.User.ID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
 				return
 			}
 
 			//success
-			discord.CreateMessage(s, i.Interaction, fmt.Sprintf("user %s leave from %s.", i.Member.User.Mention(), channelID.StringValue()))
+			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s joined into %s.", i.Member.User.Mention(), channelID.StringValue()), instantMessageDuration)
 		},
-		commandDeleteChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+
+		//Command Invite User
+		commandInviteChannelUser: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to invite user to channel", instantMessageDuration)
+
+			//get option
 			optMap := getOptionMap(i.Interaction)
-			channelID, ok := optMap[optionChannelID]
+			channelOpt, ok := optMap[optionChannel]
 			if !ok {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: option {%s} is needed.", optionChannelID))
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannel), instantMessageDuration)
+				return
+			}
+			userOpt, ok := optMap[optionUser]
+			if !ok {
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionUser), instantMessageDuration)
+				return
+			}
+			channel := channelOpt.ChannelValue(s)
+			user := userOpt.UserValue(s)
+
+			//invite
+			if err := discordDriver.InviteUserToChannel(s, i.Member.User.ID, i.GuildID, channel.ID, user.ID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
 				return
 			}
 
-			c, err := discord.DeleteChannel(s, channelID.StringValue())
-			if err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to delete channel. %v", err))
-				return
-			}
-
-			if err := discordChannelDriver.DeleteChannel(i.GuildID, channelID.StringValue()); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to delete channel from database. %v", err))
-				return
-			}
-
-			if err := discordChannelUserDriver.DeleteChannelUsersOfChannel(i.GuildID, channelID.StringValue()); err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: failed to delete channel-user-relation from database. %v", err))
-				return
-			}
-
-			discord.CreateMessage(s, i.Interaction, fmt.Sprintf("deleted channel. Name: %s", c.Name))
+			//success
+			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s joined into %s.", user.Mention(), channel.Mention()), instantMessageDuration)
 		},
-		commandShowChannels: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			channels, err := discordChannelDriver.GetChannels(i.GuildID)
-			if err != nil {
-				discord.CreateMessage(s, i.Interaction, fmt.Sprintf("error: %v", err))
+
+		//Command Leave Channel
+		commandLeaveChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to leave channel", instantMessageDuration)
+
+			optMap := getOptionMap(i.Interaction)
+			channelOpt, ok := optMap[optionChannel]
+			if !ok {
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannel), instantMessageDuration)
+				return
+			}
+			channel := channelOpt.ChannelValue(s)
+
+			//leave channel
+			if err := discordDriver.LeaveChannel(s, i.GuildID, channel.ID, i.Member.User.ID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
 			}
 
-			content := fmt.Sprintf("channels: %d\n", len(channels))
-			for _, channel := range channels {
-				isPrivateText := "public"
-				if channel.IsPrivate {
-					isPrivateText = "private"
-				}
-				content += fmt.Sprintf("[%s] `%s` %s: %s\n", isPrivateText, channel.ChannelID, channel.ChannelName, channel.ChannelTopic.String)
-			}
-
-			discord.CreateMessage(s, i.Interaction, content)
+			//success
+			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s leave from %s.", i.Member.User.Mention(), channel.Mention()), instantMessageDuration)
 		},
+
+		//Command Delete Channel
+		commandDeleteChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to delete channel", instantMessageDuration)
+
+			//option
+			optMap := getOptionMap(i.Interaction)
+			channelOpt, ok := optMap[optionChannel]
+			if !ok {
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannel), instantMessageDuration)
+				return
+			}
+			channel := channelOpt.ChannelValue(s)
+
+			//delete channel
+			c, err := discordDriver.DeleteChannel(s, i.GuildID, channel.ID)
+			if err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+
+			//success
+			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("deleted channel. Name: %s", c.Name), instantMessageDuration)
+
+			//show info
+			if err := discordDriver.ShowInfo(s, i.GuildID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+		},
+
+		//Command Update Info
+		commandUpdateInfo: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to update information", instantMessageDuration)
+
+			if err := discordDriver.ShowInfo(s, i.GuildID); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+			discord.FollowUpMessageInstant(s, i.Interaction, "information updated.", instantMessageDuration)
+		},
+
+		//Command Test
 		commandTest: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			discord.CreateMessage(s, i.Interaction, "test by "+i.Member.User.Username)
+			discord.CreateMessageInstant(s, i.Interaction, "test by "+i.Member.User.Username, instantMessageDuration)
 		},
 	}
 	return commandHandlers

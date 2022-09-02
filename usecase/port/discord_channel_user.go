@@ -9,6 +9,7 @@ type DiscordChannelUserInputPort interface {
 
 	GetChannelUsersOfGuild(guildID string) ([]*entity.DiscordChannelUser, error)
 	GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error)
+	GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error)
 	GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error)
 }
 
@@ -22,5 +23,6 @@ type DiscordChannelUserRepository interface {
 
 	GetChannelUsersOfGuild(guildID string) ([]*entity.DiscordChannelUser, error)
 	GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error)
+	GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error)
 	GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error)
 }

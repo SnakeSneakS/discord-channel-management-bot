@@ -1,4 +1,4 @@
-package driver
+package discord_channel_user
 
 import (
 	"log"
@@ -7,12 +7,15 @@ import (
 	"github.com/snakesneaks/discord-channel-management-bot/adapter/gateway"
 	"github.com/snakesneaks/discord-channel-management-bot/adapter/presenter"
 	"github.com/snakesneaks/discord-channel-management-bot/driver/db"
+	"github.com/snakesneaks/discord-channel-management-bot/entity"
 	"github.com/snakesneaks/discord-channel-management-bot/usecase/interactor"
 )
 
 type DiscordChannelUserDriver interface {
 	DeleteChannelUsersOfChannel(guildID, channelID string) error
 	JoinOrLeaveChannel(guildID, channelID, userID string, isJoin bool) error
+	GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error)
+	GetChannelUserNumInChannel(guildID, channelID string) (int, error)
 }
 
 type discordChannelUserDriver struct {
@@ -48,6 +51,18 @@ func (d discordChannelUserDriver) JoinOrLeaveChannel(guildID, channelID, userID 
 
 func (d discordChannelUserDriver) DeleteChannelUsersOfChannel(guildID, channelID string) error {
 	return d.controller.DeleteChannel(guildID, channelID)
+}
+
+func (d discordChannelUserDriver) GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error) {
+	return d.controller.GetChannelUserInChannel(guildID, channelID, userID)
+}
+
+func (d discordChannelUserDriver) GetChannelUserNumInChannel(guildID, channelID string) (int, error) {
+	channelUsers, err := d.controller.GetChannelUsersInChannel(guildID, channelID)
+	if err != nil {
+		return 0, nil
+	}
+	return len(channelUsers), nil
 }
 
 /*

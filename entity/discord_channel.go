@@ -29,6 +29,8 @@ type DiscordChannel struct {
 type DiscordChannelSetting struct {
 	gorm.Model
 
-	GuildID          string
-	ParentCategoryID string
+	GuildID                     string
+	ParentCategoryID            string
+	DescriptionChannelID        string
+	DescriptionChannelMessageID string
 }

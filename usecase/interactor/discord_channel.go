@@ -49,11 +49,3 @@ func (interactor discordChannelInteractor) GetChannel(guildID, channelID string)
 func (interactor discordChannelInteractor) GetChannels(guildID string) ([]*entity.DiscordChannel, error) {
 	return interactor.repository.GetChannels(guildID)
 }
-
-func (interactor discordChannelInteractor) GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error) {
-	return interactor.repository.GetSetting(guildID)
-}
-
-func (interactor discordChannelInteractor) CreateOrUpdateSetting(s *entity.DiscordChannelSetting) error {
-	return interactor.repository.CreateOrUpdateSetting(s)
-}

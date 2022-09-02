@@ -21,9 +21,6 @@ type DiscordChannelController interface {
 	UpdateChannelArchive(guildID, channelID string, newIsArchive bool) error
 	UpdateLastMessageTime(guildID, channelID string, newLastMessageTime time.Time) error
 	DeleteChannel(guildID, channelID string) error
-
-	GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error)
-	CreateOrUpdateSetting(*entity.DiscordChannelSetting) error
 }
 
 type discordChannelController struct {
@@ -154,16 +151,11 @@ func (c discordChannelController) DeleteChannel(guildID, channelID string) error
 	return inputPort.DeleteChannel(guildID, channelID)
 }
 
-func (c discordChannelController) GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error) {
+/*
+func (c discordChannelController) ShowChannels(guildID string) (string, error) {
 	repo := c.RepoFactory(c.conn)
 	outputPort := c.OutputFactory()
 	inputPort := c.InputFactory(outputPort, repo)
-	return inputPort.GetSetting(guildID)
+	return inputPort.ShowChannels(guildID)
 }
-
-func (c discordChannelController) CreateOrUpdateSetting(s *entity.DiscordChannelSetting) error {
-	repo := c.RepoFactory(c.conn)
-	outputPort := c.OutputFactory()
-	inputPort := c.InputFactory(outputPort, repo)
-	return inputPort.CreateOrUpdateSetting(s)
-}
+*/

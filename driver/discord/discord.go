@@ -1,12 +1,16 @@
 package discord
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"fmt"
+
+	"github.com/bwmarrin/discordgo"
+)
 
 // CreateChannel
-func CreateChannel(s *discordgo.Session, i *discordgo.Interaction, channelName, channelTopic, categoryID string, isPrivate bool) (*discordgo.Channel, error) {
-	c, err := s.GuildChannelCreate(i.GuildID, channelName, discordgo.ChannelTypeGuildText)
+func CreateChannel(s *discordgo.Session, guildID, channelName, channelTopic, categoryID string, isPrivate bool, channelType discordgo.ChannelType) (*discordgo.Channel, error) {
+	c, err := s.GuildChannelCreate(guildID, channelName, channelType)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error: failed to create channel. %v", err)
 	}
 
 	c, err = s.ChannelEditComplex(c.ID, &discordgo.ChannelEdit{
@@ -17,27 +21,8 @@ func CreateChannel(s *discordgo.Session, i *discordgo.Interaction, channelName, 
 		//Archived:             &isArchive, //スレッドはアーカイブできるらしい?
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error: failed to create channel. %v", err)
 	}
-
-	//channel permission
-	g, err := s.State.Guild(i.GuildID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, role := range g.Roles {
-		if err := s.ChannelPermissionSet(
-			c.ID,
-			role.ID,
-			discordgo.PermissionOverwriteTypeRole,
-			0,
-			discordgo.PermissionAll,
-		); err != nil {
-			return c, err
-		}
-	}
-
 	/*
 		if err := SetMemberPermissionToChannel(s, c.ID, i.Member.User.ID, true); err != nil {
 			return c, err
@@ -45,6 +30,28 @@ func CreateChannel(s *discordgo.Session, i *discordgo.Interaction, channelName, 
 	*/
 
 	return c, nil
+}
+
+// Channel閲覧権限を無に返す
+func DenyAllRolesToChannel(s *discordgo.Session, guildID, channelID string) error {
+	g, err := s.State.Guild(guildID)
+	if err != nil {
+		return fmt.Errorf("error: failed to get guild. %v", err)
+	}
+
+	for _, role := range g.Roles {
+		if err := s.ChannelPermissionSet(
+			channelID,
+			role.ID,
+			discordgo.PermissionOverwriteTypeRole,
+			0,
+			discordgo.PermissionAll,
+		); err != nil {
+			return fmt.Errorf("error: failed to change permission. %v", err)
+		}
+	}
+
+	return nil
 }
 
 func DeleteChannel(s *discordgo.Session, channelID string) (*discordgo.Channel, error) {
@@ -60,7 +67,7 @@ func SetMemberPermissionToChannel(s *discordgo.Session, channelID, userID string
 			discordgo.PermissionAllText,
 			0,
 		); err != nil {
-			return err
+			return fmt.Errorf("error: failed to change permission. %v", err)
 		}
 	} else {
 		if err := s.ChannelPermissionSet(
@@ -70,15 +77,15 @@ func SetMemberPermissionToChannel(s *discordgo.Session, channelID, userID string
 			0,
 			discordgo.PermissionAll,
 		); err != nil {
-			return err
+			return fmt.Errorf("error: failed to change permission. %v", err)
 		}
 	}
 
 	return nil
 }
 
-func CreateCategory(s *discordgo.Session, i *discordgo.Interaction, categoryName, categoryTopic string, categoryPosition int) (*discordgo.Channel, error) {
-	c, err := s.GuildChannelCreate(i.GuildID, categoryName, discordgo.ChannelTypeGuildCategory)
+func CreateCategory(s *discordgo.Session, guildID, categoryName, categoryTopic string, categoryPosition int) (*discordgo.Channel, error) {
+	c, err := s.GuildChannelCreate(guildID, categoryName, discordgo.ChannelTypeGuildCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -93,4 +100,14 @@ func CreateCategory(s *discordgo.Session, i *discordgo.Interaction, categoryName
 	}
 
 	return c, nil
+}
+
+// Get Channel By ID
+func GetChannel(s *discordgo.Session, guildID, channelID string) (*discordgo.Channel, error) {
+
+	channel, err := s.State.Channel(channelID)
+	if err != nil {
+		return nil, fmt.Errorf("channel not found. guildID: %s, channelID: %s", guildID, channelID)
+	}
+	return channel, nil
 }

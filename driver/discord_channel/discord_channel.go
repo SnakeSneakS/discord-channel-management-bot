@@ -1,4 +1,4 @@
-package driver
+package discord_channel
 
 import (
 	"log"
@@ -18,9 +18,6 @@ type DiscordChannelDriver interface {
 
 	DeleteChannel(guildID, channelID string) error
 	CreateChannel(guildID, channelID, channelName, channelTopic, userID string, isPrivate bool) error
-
-	GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error)
-	CreateSetting(guildID, categoryID string) (*entity.DiscordChannelSetting, error)
 }
 
 type discordChannelDriver struct {
@@ -61,17 +58,8 @@ func (d discordChannelDriver) CreateChannel(guildID, channelID, channelName, cha
 	return d.controller.CreateChannel(guildID, channelID, channelName, channelTopic, userID, isPrivate, discordgo.ChannelTypeGuildText)
 }
 
-func (d discordChannelDriver) GetSetting(guildID string) (*entity.DiscordChannelSetting, bool, error) {
-	return d.controller.GetSetting(guildID)
+/*
+func (d discordChannelDriver) ShowChannels(guildID string) (string, error){
+	return d.controller.
 }
-
-func (d discordChannelDriver) CreateSetting(guildID, categoryID string) (*entity.DiscordChannelSetting, error) {
-	setting := &entity.DiscordChannelSetting{
-		GuildID:          guildID,
-		ParentCategoryID: categoryID,
-	}
-	if err := d.controller.CreateOrUpdateSetting(setting); err != nil {
-		return setting, err
-	}
-	return setting, nil
-}
+*/

@@ -13,6 +13,7 @@ type DiscordChannelUserController interface {
 
 	GetChannelUsersOfGuild(guildID string) ([]*entity.DiscordChannelUser, error)
 	GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error)
+	GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error)
 	GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error)
 }
 
@@ -55,6 +56,10 @@ func (c discordChannelUserController) GetChannelUsersOfGuild(guildID string) ([]
 
 func (c discordChannelUserController) GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error) {
 	return c.InputFactory(c.OutputFactory(), c.RepoFactory(c.conn)).GetChannelUsersOfUser(guildID, userID)
+}
+
+func (c discordChannelUserController) GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error) {
+	return c.InputFactory(c.OutputFactory(), c.RepoFactory(c.conn)).GetChannelUserInChannel(guildID, channelID, userID)
 }
 
 func (c discordChannelUserController) GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error) {

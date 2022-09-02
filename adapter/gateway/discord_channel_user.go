@@ -114,6 +114,16 @@ func (r discordChannelUserRepository) GetChannelUsersOfUser(guildID, userID stri
 	return discordChannelUsers, nil
 
 }
+
+func (r discordChannelUserRepository) GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error) {
+	var discordChannelUsers *entity.DiscordChannelUser
+	tx := r.conn.Where("guild_id = ? and channel_id = ? and user_id = ?", guildID, channelID, userID).First(&discordChannelUsers)
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return nil, tx.Error
+	}
+	return discordChannelUsers, nil
+}
+
 func (r discordChannelUserRepository) GetChannelUsersInChannel(guildID, channelID string) ([]*entity.DiscordChannelUser, error) {
 	var discordChannelUsers []*entity.DiscordChannelUser
 	tx := r.conn.Where("guild_id = ? and channel_id = ?", guildID, channelID).Find(&discordChannelUsers)
