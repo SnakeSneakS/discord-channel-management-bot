@@ -194,6 +194,10 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 
 			//success
 			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("channel created!\n`id`: %s\n`name`: %s\n`topic`: %s", c.ID, c.Name, c.Topic), instantMessageDuration)
+			if _, err = s.ChannelMessageSend(c.ID, fmt.Sprintf("Channel created!!\nID: %s\nName: %s\nTopic: %s", c.ID, c.Name, c.Topic)); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
 
 			//show info
 			if err := discordDriver.ShowInfo(s, i.GuildID); err != nil {
@@ -222,6 +226,10 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 
 			//success
 			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s joined into %s.", i.Member.User.Mention(), channelID.StringValue()), instantMessageDuration)
+			if _, err := s.ChannelMessageSend(channelID.StringValue(), fmt.Sprintf("user joined! %s", i.Member.User.Mention())); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
 		},
 
 		//Command Invite User
@@ -251,6 +259,10 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 
 			//success
 			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s joined into %s.", user.Mention(), channel.Mention()), instantMessageDuration)
+			if _, err := s.ChannelMessageSend(channel.ID, fmt.Sprintf("user joined! %s", user.Mention())); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
 		},
 
 		//Command Leave Channel
@@ -273,6 +285,10 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 
 			//success
 			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("user %s leave from %s.", i.Member.User.Mention(), channel.Mention()), instantMessageDuration)
+			if _, err := s.ChannelMessageSend(channel.ID, fmt.Sprintf("user left! %s", i.Member.User.Mention())); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
 		},
 
 		//Command Delete Channel
