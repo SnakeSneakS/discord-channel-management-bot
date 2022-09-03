@@ -14,6 +14,7 @@ import (
 type DiscordChannelUserDriver interface {
 	DeleteChannelUsersOfChannel(guildID, channelID string) error
 	JoinOrLeaveChannel(guildID, channelID, userID string, isJoin bool) error
+	GetChannelUserOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error)
 	GetChannelUserInChannel(guildID, channelID, userID string) (*entity.DiscordChannelUser, error)
 	GetChannelUserNumInChannel(guildID, channelID string) (int, error)
 }
@@ -63,6 +64,10 @@ func (d discordChannelUserDriver) GetChannelUserNumInChannel(guildID, channelID 
 		return 0, nil
 	}
 	return len(channelUsers), nil
+}
+
+func (d discordChannelUserDriver) GetChannelUserOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error) {
+	return d.controller.GetChannelUsersOfUser(guildID, userID)
 }
 
 /*

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/snakesneaks/discord-channel-management-bot/driver/discord"
@@ -21,6 +22,9 @@ const (
 	channelTopic    = "this is a channel where this bot show imformation."
 	categoryPositon = 99999
 )
+
+// when message is automatically deleted in messageDescriptionChannel
+var messageRemainDuration = time.Minute
 
 // error for validate setting
 var (
@@ -42,7 +46,12 @@ type DiscordDriver interface {
 	InviteUserToChannel(s *discordgo.Session, subjectUserID, guildID, channelID, userID string) error
 	LeaveChannel(s *discordgo.Session, guildID, channelID, userID string) error
 	DeleteChannel(s *discordgo.Session, guildID, channelID string) (*discordgo.Channel, error)
+	UpdateChannel(s *discordgo.Session, subjectUserID, guildID, channelID, channelName, channelTopic string, isPrivate bool) error
 	ShowInfo(s *discordgo.Session, guildID string) error
+	GetChannel(guildID, channelID string) (*entity.DiscordChannel, error)
+
+	GetChannelsInGuild(guildID string) ([]*entity.DiscordChannel, error)
+	GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error)
 }
 
 type discordDriver struct {
@@ -303,6 +312,36 @@ func (d discordDriver) DeleteChannel(s *discordgo.Session, guildID, channelID st
 	return c, nil
 }
 
+func (d discordDriver) UpdateChannel(s *discordgo.Session, subjectUserID, guildID, channelID, channelName, channelTopic string, isPrivate bool) error {
+	//user authorization
+	if _, err := d.discordChannelUserDriver.GetChannelUserInChannel(guildID, channelID, subjectUserID); err != nil {
+		return fmt.Errorf("user is not in the channel. access denied")
+	}
+
+	//update channel in discord
+	setting, err := d.getOrInitSetting(s, guildID)
+	if err != nil {
+		return err
+	}
+	channel, err := d.validateChannel(s, guildID, channelID, setting)
+	if err != nil {
+		return err
+	}
+	if _, err := s.ChannelEditComplex(channel.ID, &discordgo.ChannelEdit{
+		Name:  channelName,
+		Topic: channelTopic,
+	}); err != nil {
+		return err
+	}
+
+	//update channel in database
+	if err := d.discordChannelDriver.UpdateChannel(guildID, channelID, channelName, channelTopic, isPrivate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ShowInfo show information
 func (d discordDriver) ShowInfo(s *discordgo.Session, guildID string) error {
 
@@ -334,10 +373,10 @@ func (d discordDriver) ShowInfo(s *discordgo.Session, guildID string) error {
 
 		if channel.IsPrivate {
 			//privateChannels += fmt.Sprintf("`%s` **#%s** (num: %d)\n", channel.ChannelID, channel.ChannelName, num)
-			privateChannels += fmt.Sprintf("Name: **%s**\nID:        %s\nTopic:   %s\nnum:     %d\n\n", channel.ChannelName, channel.ChannelID, channel.ChannelTopic.String, num)
+			privateChannels += fmt.Sprintf("Name: **%s**\nTopic:   %s\nID:        %s\nnum:     %d\n\n", channel.ChannelName, channel.ChannelID, channel.ChannelTopic.String, num)
 		} else {
 			//publicChannels += fmt.Sprintf("`%s` **#%s** (num: %d)\n", channel.ChannelID, channel.ChannelName, num)
-			publicChannels += fmt.Sprintf("Name: **%s**\nID:        %s\nTopic:   %s\nnum:     %d\n\n", channel.ChannelName, channel.ChannelID, channel.ChannelTopic.String, num)
+			publicChannels += fmt.Sprintf("Name: **%s**\nTopic:   %s\nID:        %s\nnum:     %d\n\n", channel.ChannelName, channel.ChannelID, channel.ChannelTopic.String, num)
 		}
 	}
 	content += fmt.Sprintf("\n%s\n%s\n", publicChannels, privateChannels)
@@ -375,7 +414,12 @@ func (d discordDriver) validateSetting(s *discordgo.Session, guildID string, set
 	for _, message := range messages {
 		if message.ID == setting.DescriptionChannelMessageID {
 			isDescriptionMessageExist = true
-			break
+		} else {
+			if time.Since(message.Timestamp) > messageRemainDuration {
+				if err := s.ChannelMessageDelete(message.ChannelID, message.ID); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if !isDescriptionMessageExist {
@@ -408,4 +452,16 @@ func (d discordDriver) validateChannel(s *discordgo.Session, guildID, channelID 
 	}
 
 	return channel, nil
+}
+
+func (d discordDriver) GetChannel(guildID, channelID string) (*entity.DiscordChannel, error) {
+	return d.discordChannelDriver.GetChannel(guildID, channelID)
+}
+
+func (d discordDriver) GetChannelsInGuild(guildID string) ([]*entity.DiscordChannel, error) {
+	return d.discordChannelDriver.GetChannels(guildID)
+}
+
+func (d discordDriver) GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error) {
+	return d.discordChannelUserDriver.GetChannelUserOfUser(guildID, userID)
 }

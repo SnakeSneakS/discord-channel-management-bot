@@ -22,7 +22,8 @@ const (
 	commandInviteChannelUser = "invite"
 	commandLeaveChannel      = "leave"
 	commandDeleteChannel     = "delete"
-	commandUpdateInfo        = "update-info"
+	commandUpdateChannel     = "update"
+	commandShowChannels      = "show-channels"
 	commandTest              = "test"
 
 	optionChannelName      = "channel-name"
@@ -124,8 +125,38 @@ func newDiscordCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        commandUpdateInfo,
-			Description: "update info",
+			Name:        commandUpdateChannel,
+			Description: "update channel setting",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        optionChannel,
+					Description: "channel",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        optionChannelName,
+					Description: "channel name",
+					Required:    false,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        optionChannelTopic,
+					Description: "explanation what this channel do",
+					Required:    false,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        optionChannelIsPrivate,
+					Description: "is channel private? if private, invitation is needed to join the channel",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        commandShowChannels,
+			Description: "show channels",
 		},
 		/*
 			{
@@ -194,7 +225,7 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 
 			//success
 			discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("channel created!\n`id`: %s\n`name`: %s\n`topic`: %s", c.ID, c.Name, c.Topic), instantMessageDuration)
-			if _, err = s.ChannelMessageSend(c.ID, fmt.Sprintf("Channel created!!\nID: %s\nName: %s\nTopic: %s", c.ID, c.Name, c.Topic)); err != nil {
+			if _, err = s.ChannelMessageSend(c.ID, fmt.Sprintf("Channel created!!\nID: %s\nName: %s\nTopic: %s\nIsPrivate: %t\n", c.ID, c.Name, c.Topic, isPrivate.BoolValue())); err != nil {
 				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
 				return
 			}
@@ -321,15 +352,108 @@ func newDiscordCommandHandler() map[string]func(s *discordgo.Session, i *discord
 			}
 		},
 
-		//Command Update Info
-		commandUpdateInfo: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			discord.CreateMessageInstant(s, i.Interaction, "trying to update information", instantMessageDuration)
+		//Command Update Channel
+		commandUpdateChannel: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to update channel setting", instantMessageDuration)
 
+			//option
+			optMap := getOptionMap(i.Interaction)
+			channelOpt, ok := optMap[optionChannel]
+			if !ok {
+				discord.FollowUpMessageInstant(s, i.Interaction, fmt.Sprintf("error: option %s is needed.", optionChannel), instantMessageDuration)
+				return
+			}
+			channel := channelOpt.ChannelValue(s)
+			discordChannel, err := discordDriver.GetChannel(i.GuildID, channel.ID)
+			if err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+			var channelName string
+			channelNameOpt, ok := optMap[optionChannelName]
+			if !ok {
+				channelName = discordChannel.ChannelName
+			} else {
+				channelName = channelNameOpt.StringValue()
+			}
+			var channelTopic string
+			channelTopicOpt, ok := optMap[optionChannelTopic]
+			if !ok {
+				channelTopic = discordChannel.ChannelTopic.String
+			} else {
+				channelTopicOpt.StringValue()
+			}
+			var isPrivate bool
+			isPrivateOpt, ok := optMap[optionChannelIsPrivate]
+			if !ok {
+				isPrivate = discordChannel.IsPrivate
+			} else {
+				isPrivate = isPrivateOpt.BoolValue()
+			}
+
+			//update
+			if err := discordDriver.UpdateChannel(s, i.Member.User.ID, i.GuildID, channel.ID, channelName, channelTopic, isPrivate); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+
+			//success
+			discord.FollowUpMessageInstant(s, i.Interaction, "channel setting updated.", instantMessageDuration)
+			if _, err = s.ChannelMessageSend(channel.ID, fmt.Sprintf("Channel setting changed!!\nID: %s\nName: %s\nTopic: %s\nIsPrivate: %t\n", channel.ID, channel.Name, channel.Topic, isPrivate)); err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+
+			//show info
 			if err := discordDriver.ShowInfo(s, i.GuildID); err != nil {
 				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
 				return
 			}
-			discord.FollowUpMessageInstant(s, i.Interaction, "information updated.", instantMessageDuration)
+		},
+
+		//Command Update Info
+		commandShowChannels: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			discord.CreateMessageInstant(s, i.Interaction, "trying to show channels", instantMessageDuration)
+
+			//existing channels
+			discordChannels, err := discordDriver.GetChannelsInGuild(i.GuildID)
+			if err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+
+			//joining channels
+			discordChannelUsers, err := discordDriver.GetChannelUsersOfUser(i.GuildID, i.Member.User.ID)
+			if err != nil {
+				discord.FollowUpMessageInstant(s, i.Interaction, err.Error(), instantMessageDuration)
+				return
+			}
+			joiningChannels := make(map[string]interface{}, len(discordChannelUsers))
+			for _, v := range discordChannelUsers {
+				joiningChannels[v.ChannelID] = nil
+			}
+
+			content := "**[show channels]**: \nalready joined channels are __underlined__\n"
+			publicChannels := "\n[public] \n"
+			privateChannels := "\n[private] \n"
+			for _, channel := range discordChannels {
+				var addContent string
+				if _, ok := joiningChannels[channel.ChannelID]; ok {
+					addContent = fmt.Sprintf("`%s` __%s__\n", channel.ChannelID, channel.ChannelName)
+				} else {
+
+					addContent = fmt.Sprintf("`%s` %s\n", channel.ChannelID, channel.ChannelName)
+				}
+				if channel.IsPrivate {
+					privateChannels += addContent
+				} else {
+					publicChannels += addContent
+				}
+			}
+			content += publicChannels
+			content += privateChannels
+
+			discord.FollowUpMessageInstant(s, i.Interaction, content, instantMessageDuration)
 		},
 
 		//Command Test

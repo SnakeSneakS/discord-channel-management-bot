@@ -107,7 +107,7 @@ func (r discordChannelUserRepository) GetChannelUsersOfGuild(guildID string) ([]
 
 func (r discordChannelUserRepository) GetChannelUsersOfUser(guildID, userID string) ([]*entity.DiscordChannelUser, error) {
 	var discordChannelUsers []*entity.DiscordChannelUser
-	tx := r.conn.Where("guild_id = ? and user_id = ?", userID).Find(&discordChannelUsers)
+	tx := r.conn.Where("guild_id = ? and user_id = ?", guildID, userID).Find(&discordChannelUsers)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return nil, tx.Error
 	}

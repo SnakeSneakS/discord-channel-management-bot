@@ -18,6 +18,7 @@ type DiscordChannelDriver interface {
 
 	DeleteChannel(guildID, channelID string) error
 	CreateChannel(guildID, channelID, channelName, channelTopic, userID string, isPrivate bool) error
+	UpdateChannel(guildID, channelID, channelName, channelTopic string, isPrivate bool) error
 }
 
 type discordChannelDriver struct {
@@ -58,8 +59,6 @@ func (d discordChannelDriver) CreateChannel(guildID, channelID, channelName, cha
 	return d.controller.CreateChannel(guildID, channelID, channelName, channelTopic, userID, isPrivate, discordgo.ChannelTypeGuildText)
 }
 
-/*
-func (d discordChannelDriver) ShowChannels(guildID string) (string, error){
-	return d.controller.
+func (d discordChannelDriver) UpdateChannel(guildID, channelID, channelName, channelTopic string, isPrivate bool) error {
+	return d.controller.UpdateChannel(guildID, channelID, channelName, channelTopic, isPrivate)
 }
-*/

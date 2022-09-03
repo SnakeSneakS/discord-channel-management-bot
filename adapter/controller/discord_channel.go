@@ -15,6 +15,7 @@ type DiscordChannelController interface {
 	GetChannels(guildID string) ([]*entity.DiscordChannel, error)
 
 	CreateChannel(guildID, channelID, channelName, channelTopic, userID string, isPrivate bool, t discordgo.ChannelType) error
+	UpdateChannel(guildID, channelID, channelName, channelTopic string, isPrivate bool) error
 	UpdateChannelName(guildID, channelID string, newChannelName string) error
 	UpdateChannelTopic(guildID, channelID string, newChannelTopic sql.NullString) error
 	UpdateChannelPrivate(guildID, channelID string, newIsPrivate bool) error
@@ -77,6 +78,23 @@ func (c discordChannelController) CreateChannel(guildID, channelID, channelName,
 	outputPort := c.OutputFactory()
 	inputPort := c.InputFactory(outputPort, repo)
 	return inputPort.CreateChannel(&channel)
+}
+
+func (c discordChannelController) UpdateChannel(guildID, channelID, channelName, channelTopic string, isPrivate bool) error {
+	repoFactory := c.RepoFactory(c.conn)
+	channel, err := repoFactory.GetChannel(guildID, channelID)
+	if err != nil {
+		return err
+	}
+	channel.GuildID = guildID
+	channel.ChannelID = channelID
+	channel.ChannelName = channelName
+	channel.ChannelTopic = channel.ChannelTopic
+	channel.IsPrivate = isPrivate
+	repo := c.RepoFactory(c.conn)
+	outputPort := c.OutputFactory()
+	inputPort := c.InputFactory(outputPort, repo)
+	return inputPort.UpdateChannel(channel)
 }
 
 func (c discordChannelController) UpdateChannelName(guildID, channelID string, newChannelName string) error {
