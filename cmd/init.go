@@ -42,12 +42,12 @@ func startGuildSession(s *discordgo.Session, guildID string) {
 	//s.ChannelMessageSend("707961532457156652", "i'm here!")
 
 	//remove commands
-	/**/
-	log.Println("Removing commands...")
-	if err := removeCommands(s, guildID); err != nil {
-		log.Println(err)
-	}
-	/**/
+	/*
+		log.Println("Removing commands...")
+		if err := removeCommands(s, guildID); err != nil {
+			log.Println(err)
+		}
+	*/
 
 	//add commands
 	log.Println("Adding commands...")
