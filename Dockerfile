@@ -1,8 +1,8 @@
-FROM golang:1.19 as development
+FROM golang:1.20 as development
 WORKDIR /work
 CMD ["go","run","main.go"]
 
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
 WORKDIR /work
 COPY . /work
 RUN go mod download
