@@ -1,4 +1,3 @@
-# Discordが標準でこの「チャンネルの表示・非表示する機能」を追加したため、本botを使う主な理由がなくなりました。
 
 # discord channel management bot
 discordのchannelを好きに作成したり参加・不参加したりできるbot 
